@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xử lý file PDF - Halloween Edition</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎃 Xử lý file PDF 🦇</h1>
+        <div class="designer-credit">Thiết kế bởi Trầm Tấn Khá</div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="merge">Gộp PDF</button>
+            <button class="tab-btn" data-tab="split">Tách PDF</button>
+            <button class="tab-btn" data-tab="booklet">Tạo sổ PDF</button>
+        </div>
+
+        <!-- Tab Gộp PDF -->
+        <div id="merge" class="tab-content active">
+            <h2>Gộp nhiều file PDF</h2>
+            <div class="file-upload-wrapper">
+                <input type="file" id="mergeFiles" multiple accept=".pdf">
+                <label for="mergeFiles" class="file-upload-label">
+                    Chọn file PDF để gộp (có thể chọn nhiều lần)
+                </label>
+            </div>
+            <div id="mergeFileList" class="file-list"></div>
+            <button id="previewMergeBtn" class="btn btn-secondary">Xem trước</button>
+            <button id="mergeBtn" class="btn">Gộp PDF</button>
+            
+            <div id="mergePreview" class="preview-container" style="display: none;">
+                <h3>Xem trước các trang</h3>
+                <div class="preview-controls">
+                    <p>💡 Kéo thả để sắp xếp lại thứ tự file</p>
+                </div>
+                <div id="mergePreviewCanvas" class="preview-grid"></div>
+            </div>
+        </div>
+
+        <!-- Tab Tách PDF -->
+        <div id="split" class="tab-content">
+            <h2>Tách file PDF</h2>
+            <div class="file-upload-wrapper">
+                <input type="file" id="splitFile" accept=".pdf">
+                <label for="splitFile" class="file-upload-label">
+                    Chọn file PDF để tách
+                </label>
+            </div>
+            <div id="splitInfo"></div>
+            <div class="split-options">
+                <label>
+                    <input type="radio" name="splitMode" value="range" checked> Tách theo khoảng trang
+                </label>
+                <label>
+                    <input type="radio" name="splitMode" value="individual"> Tách từng trang thành file riêng
+                </label>
+            </div>
+            <div id="rangeOptions" class="split-options">
+                <label>Tách từ trang: <input type="number" id="splitFrom" min="1" value="1"></label>
+                <label>Đến trang: <input type="number" id="splitTo" min="1" value="1"></label>
+            </div>
+            <button id="previewSplitBtn" class="btn btn-secondary">Xem trước</button>
+            <button id="splitBtn" class="btn">Tách PDF</button>
+            
+            <div id="splitPreview" class="preview-container" style="display: none;">
+                <h3>Xem trước các trang sẽ tách</h3>
+                <div id="splitPreviewCanvas" class="preview-grid"></div>
+            </div>
+        </div>
+
+        <!-- Tab Tạo sổ PDF -->
+        <div id="booklet" class="tab-content">
+            <h2>Tạo sổ PDF</h2>
+            
+            <div class="split-options" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 10px;">
+                    <input type="radio" name="bookletMode" value="separate" checked> 4 file riêng biệt
+                </label>
+                <label style="display: flex; align-items: center; gap: 10px;">
+                    <input type="radio" name="bookletMode" value="single"> 1 file PDF (4 trang)
+                </label>
+            </div>
+
+            <div id="separateMode" class="booklet-upload">
+                <div class="upload-item">
+                    <label>File trang đầu:</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="coverFile" accept=".pdf">
+                        <label for="coverFile" class="file-upload-label">Chọn file trang đầu</label>
+                    </div>
+                </div>
+                <div class="upload-item">
+                    <label>File nội dung 1:</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="content1File" accept=".pdf">
+                        <label for="content1File" class="file-upload-label">Chọn file nội dung 1</label>
+                    </div>
+                </div>
+                <div class="upload-item">
+                    <label>File nội dung 2:</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="content2File" accept=".pdf">
+                        <label for="content2File" class="file-upload-label">Chọn file nội dung 2</label>
+                    </div>
+                </div>
+                <div class="upload-item">
+                    <label>File trang cuối:</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="backFile" accept=".pdf">
+                        <label for="backFile" class="file-upload-label">Chọn file trang cuối</label>
+                    </div>
+                </div>
+            </div>
+
+            <div id="singleMode" class="booklet-upload" style="display: none;">
+                <div class="upload-item">
+                    <label>File PDF (phải có đúng 4 trang):</label>
+                    <div class="file-upload-wrapper">
+                        <input type="file" id="singleBookletFile" accept=".pdf">
+                        <label for="singleBookletFile" class="file-upload-label">Chọn file PDF 4 trang</label>
+                    </div>
+                    <div id="singleFileInfo"></div>
+                </div>
+            </div>
+
+            <button id="previewBookletBtn" class="btn btn-secondary">Xem trước</button>
+            <button id="createBookletBtn" class="btn">Tạo sổ PDF</button>
+            
+            <div id="bookletPreview" class="preview-container" style="display: none;">
+                <h3>Xem trước sổ PDF</h3>
+                <div class="preview-controls">
+                    <button id="swapCoverBack" class="btn-small">🔄 Đổi trang đầu/cuối</button>
+                    <button id="swapContent" class="btn-small">🔄 Đổi nội dung 1/2</button>
+                </div>
+                <p style="color: #4a5568; font-size: 14px; margin-top: 8px;">💡 Hoặc kéo thả để sắp xếp lại</p>
+                <div id="previewCanvas" class="preview-grid"></div>
+            </div>
+        </div>
+
+        <div id="output" class="output"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
