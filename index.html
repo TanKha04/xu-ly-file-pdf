@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Xử lý file PDF - Halloween Edition</title>
+    <title>Xử lý file PDF - Mùa Hè 2024</title>
     <link rel="stylesheet" href="styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>🎃 Xử lý file PDF 🦇</h1>
+        <h1>🏖️ Xử lý file PDF ☀️</h1>
         <div class="designer-credit">Thiết kế bởi Trầm Tấn Khá</div>
         
         <div class="tabs">
             <button class="tab-btn active" data-tab="merge">Gộp PDF</button>
             <button class="tab-btn" data-tab="split">Tách PDF</button>
             <button class="tab-btn" data-tab="booklet">Tạo sổ PDF</button>
-            <button class="tab-btn" data-tab="print">In PDF</button>
         </div>
 
         <!-- Tab Gộp PDF -->
@@ -133,46 +132,8 @@
             
             <div id="bookletPreview" class="preview-container" style="display: none;">
                 <h3>Xem trước sổ PDF</h3>
-                <div class="preview-controls">
-                    <button id="swapCoverBack" class="btn-small">🔄 Đổi trang đầu/cuối</button>
-                    <button id="swapContent" class="btn-small">🔄 Đổi nội dung 1/2</button>
-                </div>
-                <p style="color: #4a5568; font-size: 14px; margin-top: 8px;">💡 Hoặc kéo thả để sắp xếp lại</p>
+                <p style="color: #ff8c00; font-size: 14px; margin-top: 8px;">💡 Kéo thả để sắp xếp lại trang</p>
                 <div id="previewCanvas" class="preview-grid"></div>
-            </div>
-        </div>
-
-        <!-- Tab In PDF -->
-        <div id="print" class="tab-content">
-            <h2>In file PDF</h2>
-            <div class="file-upload-wrapper">
-                <input type="file" id="printFile" accept=".pdf">
-                <label for="printFile" class="file-upload-label">
-                    Chọn file PDF để in
-                </label>
-            </div>
-            <div id="printInfo"></div>
-            
-            <div class="split-options" style="background: rgba(0, 0, 0, 0.3); padding: 20px; border-radius: 12px; border: 1px solid rgba(255, 69, 0, 0.3);">
-                <label style="flex-direction: row; align-items: center;">
-                    <input type="checkbox" id="printAllPages" checked style="width: 18px; height: 18px; margin-right: 8px; accent-color: #ff4500;">
-                    In tất cả các trang
-                </label>
-                <div id="printRangeOptions" style="display: none; width: 100%;">
-                    <label>Từ trang: <input type="number" id="printFrom" min="1" value="1"></label>
-                    <label>Đến trang: <input type="number" id="printTo" min="1" value="1"></label>
-                </div>
-            </div>
-            
-            <button id="previewPrintBtn" class="btn btn-secondary">Xem trước</button>
-            <button id="printBtn" class="btn">🖨️ In ngay</button>
-            
-            <div id="printPreview" class="preview-container" style="display: none;">
-                <h3>Xem trước file PDF</h3>
-                <div class="preview-controls">
-                    <p>💡 Cuộn xuống để xem tất cả các trang</p>
-                </div>
-                <div id="printPreviewCanvas" class="preview-grid"></div>
             </div>
         </div>
 
