@@ -15,6 +15,7 @@ let draggedElement = null;
 let pageOrder = ['cover', 'back', 'content1', 'content2']; // Thứ tự mặc định
 let mergeFiles = [];
 let mergeFileOrder = [];
+let printFileData = null;
 
 // Xử lý tabs
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -766,3 +767,167 @@ function showOutput(message, isError = false) {
     output.textContent = message;
     output.className = 'output show' + (isError ? ' error' : '');
 }
+
+// ===== IN PDF =====
+document.getElementById('printAllPages').addEventListener('change', (e) => {
+    const rangeOptions = document.getElementById('printRangeOptions');
+    if (e.target.checked) {
+        rangeOptions.style.display = 'none';
+    } else {
+        rangeOptions.style.display = 'flex';
+    }
+});
+
+document.getElementById('printFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        printFileData = arrayBuffer;
+        const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+        const pageCount = pdf.getPageCount();
+        
+        document.getElementById('printInfo').innerHTML = `
+            <strong>File:</strong> ${file.name}<br>
+            <strong>Tổng số trang:</strong> ${pageCount}
+        `;
+        document.getElementById('printTo').max = pageCount;
+        document.getElementById('printTo').value = pageCount;
+        document.getElementById('printFrom').max = pageCount;
+        
+        // Ẩn preview khi chọn file mới
+        document.getElementById('printPreview').style.display = 'none';
+    } catch (error) {
+        showOutput('Lỗi đọc file: ' + error.message, true);
+    }
+});
+
+document.getElementById('previewPrintBtn').addEventListener('click', async () => {
+    if (!printFileData) {
+        showOutput('Vui lòng chọn file PDF', true);
+        return;
+    }
+    
+    try {
+        showOutput('Đang tạo xem trước...');
+        const previewContainer = document.getElementById('printPreview');
+        const previewCanvas = document.getElementById('printPreviewCanvas');
+        previewCanvas.innerHTML = '';
+        
+        const pdf = await pdfjsLib.getDocument({data: printFileData}).promise;
+        const printAll = document.getElementById('printAllPages').checked;
+        
+        let startPage, endPage;
+        if (printAll) {
+            startPage = 1;
+            endPage = pdf.numPages;
+        } else {
+            startPage = parseInt(document.getElementById('printFrom').value);
+            endPage = parseInt(document.getElementById('printTo').value);
+            
+            if (startPage > endPage) {
+                showOutput('Trang bắt đầu phải nhỏ hơn trang kết thúc', true);
+                return;
+            }
+        }
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const page = await pdf.getPage(i);
+            const scale = 0.5;
+            const viewport = page.getViewport({scale});
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            await page.render({canvasContext: context, viewport}).promise;
+            
+            const div = document.createElement('div');
+            div.className = 'preview-page';
+            div.appendChild(canvas);
+            const p = document.createElement('p');
+            p.textContent = `Trang ${i}`;
+            div.appendChild(p);
+            previewCanvas.appendChild(div);
+        }
+        
+        previewContainer.style.display = 'block';
+        showOutput(`Xem trước ${endPage - startPage + 1} trang thành công!`);
+    } catch (error) {
+        showOutput('Lỗi: ' + error.message, true);
+    }
+});
+
+document.getElementById('printBtn').addEventListener('click', async () => {
+    if (!printFileData) {
+        showOutput('Vui lòng chọn file PDF', true);
+        return;
+    }
+    
+    try {
+        showOutput('Đang chuẩn bị in...');
+        
+        const printAll = document.getElementById('printAllPages').checked;
+        
+        if (printAll) {
+            // In toàn bộ file
+            const blob = new Blob([printFileData], {type: 'application/pdf'});
+            const url = URL.createObjectURL(blob);
+            
+            // Tạo iframe ẩn để in
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+            
+            iframe.onload = function() {
+                iframe.contentWindow.print();
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            };
+            
+            showOutput('Đã mở hộp thoại in!');
+        } else {
+            // In theo khoảng trang
+            const from = parseInt(document.getElementById('printFrom').value);
+            const to = parseInt(document.getElementById('printTo').value);
+            
+            if (from > to) {
+                showOutput('Trang bắt đầu phải nhỏ hơn trang kết thúc', true);
+                return;
+            }
+            
+            const pdf = await PDFLib.PDFDocument.load(printFileData);
+            const newPdf = await PDFLib.PDFDocument.create();
+            
+            const pages = await newPdf.copyPages(pdf, Array.from({length: to - from + 1}, (_, i) => from - 1 + i));
+            pages.forEach(page => newPdf.addPage(page));
+            
+            const pdfBytes = await newPdf.save();
+            const blob = new Blob([pdfBytes], {type: 'application/pdf'});
+            const url = URL.createObjectURL(blob);
+            
+            // Tạo iframe ẩn để in
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.src = url;
+            document.body.appendChild(iframe);
+            
+            iframe.onload = function() {
+                iframe.contentWindow.print();
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                    URL.revokeObjectURL(url);
+                }, 1000);
+            };
+            
+            showOutput(`Đã mở hộp thoại in cho trang ${from} đến ${to}!`);
+        }
+    } catch (error) {
+        showOutput('Lỗi: ' + error.message, true);
+    }
+});
