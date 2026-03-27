@@ -84,7 +84,7 @@ window.removeMergeFile = function(index) {
 
 document.getElementById('previewMergeBtn').addEventListener('click', async () => {
     if (!mergeFiles || mergeFiles.length < 2) {
-        showOutput('Vui lòng chọn ít nhất 2 file PDF', true);
+        showOutput('Vui lòng chọn ít nhất 2 file PDF hoặc hình ảnh', true);
         return;
     }
     
@@ -94,9 +94,47 @@ document.getElementById('previewMergeBtn').addEventListener('click', async () =>
         const previewCanvas = document.getElementById('mergePreviewCanvas');
         previewCanvas.innerHTML = '';
         
+        // Reset zoom
+        zoomLevels.merge = 100;
+        document.getElementById('mergeZoomLevel').textContent = '100%';
+        previewCanvas.style.transform = 'scale(1)';
+        
+        // Reset dữ liệu preview
+        mergePreviewData = [];
+        
+        let pageIndex = 0;
         for (let i = 0; i < mergeFiles.length; i++) {
             const file = mergeFiles[i];
-            await renderMergePreview(file, `File ${i + 1}: ${file.name}`, i, previewCanvas);
+            
+            if (file.type.startsWith('image/')) {
+                // Hình ảnh chỉ có 1 trang
+                mergePreviewData.push({
+                    file: file,
+                    label: `File ${i + 1}: ${file.name}`,
+                    pageIndex: pageIndex,
+                    isImage: true,
+                    pageNumber: 1
+                });
+                await renderMergePreviewPage(file, `File ${i + 1}: ${file.name}`, pageIndex, previewCanvas, true);
+                pageIndex++;
+            } else {
+                // PDF có thể có nhiều trang
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                const pageCount = pdf.getPageCount();
+                
+                for (let p = 0; p < pageCount; p++) {
+                    mergePreviewData.push({
+                        file: file,
+                        label: `File ${i + 1}: ${file.name} - Trang ${p + 1}/${pageCount}`,
+                        pageIndex: pageIndex,
+                        isImage: false,
+                        pageNumber: p + 1
+                    });
+                    await renderMergePreviewPage(file, `File ${i + 1}: ${file.name} - Trang ${p + 1}/${pageCount}`, pageIndex, previewCanvas, false, p + 1);
+                    pageIndex++;
+                }
+            }
         }
         
         previewContainer.style.display = 'block';
@@ -108,7 +146,7 @@ document.getElementById('previewMergeBtn').addEventListener('click', async () =>
 
 document.getElementById('mergeBtn').addEventListener('click', async () => {
     if (!mergeFiles || mergeFiles.length < 2) {
-        showOutput('Vui lòng chọn ít nhất 2 file PDF', true);
+        showOutput('Vui lòng chọn ít nhất 2 file PDF hoặc hình ảnh', true);
         return;
     }
     
@@ -116,14 +154,48 @@ document.getElementById('mergeBtn').addEventListener('click', async () => {
         showOutput('Đang gộp PDF...');
         const mergedPdf = await PDFLib.PDFDocument.create();
         
-        // Sử dụng thứ tự từ mergeFileOrder
-        const orderedFiles = mergeFileOrder.map(index => mergeFiles[index]);
+        // Kiểm tra xem có preview không để lấy thứ tự
+        const previewCanvas = document.getElementById('mergePreviewCanvas');
+        const hasPreview = previewCanvas.children.length > 0;
         
-        for (let file of orderedFiles) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-            const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-            pages.forEach(page => mergedPdf.addPage(page));
+        if (hasPreview) {
+            // Sử dụng thứ tự từ preview
+            const previewPages = Array.from(previewCanvas.children);
+            
+            for (let previewPage of previewPages) {
+                const label = previewPage.querySelector('p').textContent;
+                // Parse label để lấy file index và page number
+                const match = label.match(/File (\d+):.*?(?:- Trang (\d+)\/(\d+))?/);
+                if (match) {
+                    const fileIndex = parseInt(match[1]) - 1;
+                    const pageNumber = match[2] ? parseInt(match[2]) : 1;
+                    const file = mergeFiles[fileIndex];
+                    
+                    if (file.type.startsWith('image/')) {
+                        // Xử lý hình ảnh
+                        await addImageToPdf(mergedPdf, file);
+                    } else {
+                        // Xử lý PDF - chỉ thêm trang cụ thể
+                        await addPdfPageToPdf(mergedPdf, file, pageNumber - 1);
+                    }
+                }
+            }
+        } else {
+            // Không có preview, sử dụng thứ tự mặc định
+            for (let file of mergeFiles) {
+                if (file.type.startsWith('image/')) {
+                    await addImageToPdf(mergedPdf, file);
+                } else {
+                    // Thêm tất cả trang của PDF
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                    const pageIndices = pdf.getPageIndices();
+                    
+                    for (let i of pageIndices) {
+                        await addPdfPageToPdf(mergedPdf, file, i);
+                    }
+                }
+            }
         }
         
         const pdfBytes = await mergedPdf.save();
@@ -186,6 +258,11 @@ document.getElementById('previewSplitBtn').addEventListener('click', async () =>
         const previewContainer = document.getElementById('splitPreview');
         const previewCanvas = document.getElementById('splitPreviewCanvas');
         previewCanvas.innerHTML = '';
+        
+        // Reset zoom
+        zoomLevels.split = 100;
+        document.getElementById('splitZoomLevel').textContent = '100%';
+        previewCanvas.style.transform = 'scale(1)';
         
         const arrayBuffer = await file.arrayBuffer();
         
@@ -282,8 +359,23 @@ document.getElementById('splitBtn').addEventListener('click', async () => {
             showOutput('Đang tách PDF...');
             const newPdf = await PDFLib.PDFDocument.create();
             
-            const pages = await newPdf.copyPages(pdf, Array.from({length: to - from + 1}, (_, i) => from - 1 + i));
-            pages.forEach(page => newPdf.addPage(page));
+            const pageIndices = Array.from({length: to - from + 1}, (_, i) => from - 1 + i);
+            
+            for (let i of pageIndices) {
+                const [copiedPage] = await newPdf.copyPages(pdf, [i]);
+                
+                // Áp dụng resize nếu cần
+                if (resizeModes.split === 'a4' || resizeModes.split === 'letter') {
+                    const targetSize = resizeModes.split === 'a4' ? PAGE_SIZES.a4 : PAGE_SIZES.letter;
+                    const { width, height } = copiedPage.getSize();
+                    const scale = Math.min(targetSize.width / width, targetSize.height / height);
+                    
+                    copiedPage.scale(scale, scale);
+                    copiedPage.setSize(targetSize.width, targetSize.height);
+                }
+                
+                newPdf.addPage(copiedPage);
+            }
             
             const pdfBytes = await newPdf.save();
             downloadPDF(pdfBytes, `split_${from}-${to}.pdf`);
@@ -296,6 +388,17 @@ document.getElementById('splitBtn').addEventListener('click', async () => {
             for (let i = 0; i < pageCount; i++) {
                 const newPdf = await PDFLib.PDFDocument.create();
                 const [copiedPage] = await newPdf.copyPages(pdf, [i]);
+                
+                // Áp dụng resize nếu cần
+                if (resizeModes.split === 'a4' || resizeModes.split === 'letter') {
+                    const targetSize = resizeModes.split === 'a4' ? PAGE_SIZES.a4 : PAGE_SIZES.letter;
+                    const { width, height } = copiedPage.getSize();
+                    const scale = Math.min(targetSize.width / width, targetSize.height / height);
+                    
+                    copiedPage.scale(scale, scale);
+                    copiedPage.setSize(targetSize.width, targetSize.height);
+                }
+                
                 newPdf.addPage(copiedPage);
                 
                 const pdfBytes = await newPdf.save();
@@ -387,6 +490,11 @@ document.getElementById('previewBookletBtn').addEventListener('click', async () 
         const previewCanvas = document.getElementById('previewCanvas');
         previewCanvas.innerHTML = '';
         
+        // Reset zoom
+        zoomLevels.booklet = 100;
+        document.getElementById('bookletZoomLevel').textContent = '100%';
+        previewCanvas.style.transform = 'scale(1)';
+        
         // Reset thứ tự về mặc định
         pageOrder = ['cover', 'back', 'content1', 'content2'];
         
@@ -452,6 +560,20 @@ document.getElementById('createBookletBtn').addEventListener('click', async () =
                 content2: copiedPages[2],
                 back: copiedPages[3]
             };
+        }
+        
+        // Áp dụng resize cho từng trang nếu cần
+        if (resizeModes.booklet === 'a4' || resizeModes.booklet === 'letter') {
+            const targetSize = resizeModes.booklet === 'a4' ? PAGE_SIZES.a4 : PAGE_SIZES.letter;
+            
+            for (let key in pages) {
+                const page = pages[key];
+                const { width, height } = page.getSize();
+                const scale = Math.min(targetSize.width / width, targetSize.height / height);
+                
+                page.scale(scale, scale);
+                page.setSize(targetSize.width, targetSize.height);
+            }
         }
         
         // Sử dụng thứ tự từ pageOrder
@@ -696,20 +818,97 @@ function handleDragLeave(e) {
     this.classList.remove('drag-over');
 }
 
-async function renderMergePreview(file, label, fileIndex, container) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-    const page = await pdf.getPage(1);
-    
-    const scale = 0.5;
-    const viewport = page.getViewport({scale});
-    
+async function renderMergePreviewPage(file, label, pageIndex, container, isImage = false, pageNumber = 1) {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
-    canvas.height = viewport.height;
-    canvas.width = viewport.width;
     
-    await page.render({canvasContext: context, viewport}).promise;
+    // Kiểm tra xem file là PDF hay hình ảnh
+    if (isImage || file.type.startsWith('image/')) {
+        // Xử lý hình ảnh
+        const img = new Image();
+        const imageUrl = URL.createObjectURL(file);
+        
+        await new Promise((resolve, reject) => {
+            img.onload = () => {
+                const scale = 0.5;
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(imageUrl);
+                resolve();
+            };
+            img.onerror = reject;
+            img.src = imageUrl;
+        });
+    } else {
+        // Xử lý PDF
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+        const page = await pdf.getPage(pageNumber);
+        
+        const scale = 0.5;
+        const viewport = page.getViewport({scale});
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        
+        await page.render({canvasContext: context, viewport}).promise;
+    }
+    
+    const div = document.createElement('div');
+    div.className = 'preview-page';
+    div.draggable = true;
+    div.dataset.pageIndex = pageIndex;
+    
+    // Thêm sự kiện drag cho merge
+    div.addEventListener('dragstart', handleMergeDragStart);
+    div.addEventListener('dragend', handleDragEnd);
+    div.addEventListener('dragover', handleDragOver);
+    div.addEventListener('drop', handleMergeDrop);
+    div.addEventListener('dragleave', handleDragLeave);
+    
+    div.appendChild(canvas);
+    const p = document.createElement('p');
+    p.textContent = label;
+    div.appendChild(p);
+    container.appendChild(div);
+}
+
+async function renderMergePreview(file, label, fileIndex, container) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    // Kiểm tra xem file là PDF hay hình ảnh
+    if (file.type.startsWith('image/')) {
+        // Xử lý hình ảnh
+        const img = new Image();
+        const imageUrl = URL.createObjectURL(file);
+        
+        await new Promise((resolve, reject) => {
+            img.onload = () => {
+                const scale = 0.5;
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                context.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(imageUrl);
+                resolve();
+            };
+            img.onerror = reject;
+            img.src = imageUrl;
+        });
+    } else {
+        // Xử lý PDF
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+        const page = await pdf.getPage(1);
+        
+        const scale = 0.5;
+        const viewport = page.getViewport({scale});
+        
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        await page.render({canvasContext: context, viewport}).promise;
+    }
     
     const div = document.createElement('div');
     div.className = 'preview-page';
@@ -743,16 +942,6 @@ function handleMergeDrop(e) {
     }
     
     if (draggedElement !== this) {
-        // Hoán đổi vị trí trong mảng mergeFileOrder
-        const draggedIndex = parseInt(draggedElement.dataset.fileIndex);
-        const targetIndex = parseInt(this.dataset.fileIndex);
-        
-        const draggedOrderIndex = mergeFileOrder.indexOf(draggedIndex);
-        const targetOrderIndex = mergeFileOrder.indexOf(targetIndex);
-        
-        [mergeFileOrder[draggedOrderIndex], mergeFileOrder[targetOrderIndex]] = 
-            [mergeFileOrder[targetOrderIndex], mergeFileOrder[draggedOrderIndex]];
-        
         // Hoán đổi vị trí trong DOM
         const parent = this.parentNode;
         const draggedDOMIndex = Array.from(parent.children).indexOf(draggedElement);
@@ -763,6 +952,11 @@ function handleMergeDrop(e) {
         } else {
             parent.insertBefore(draggedElement, this);
         }
+        
+        // Cập nhật lại pageIndex cho tất cả các trang
+        Array.from(parent.children).forEach((child, index) => {
+            child.dataset.pageIndex = index;
+        });
     }
     
     this.classList.remove('drag-over');
@@ -784,3 +978,190 @@ function showOutput(message, isError = false) {
     output.textContent = message;
     output.className = 'output show' + (isError ? ' error' : '');
 }
+
+// ===== HÀM HỖ TRỢ =====
+
+// Hàm load hình ảnh
+function loadImage(file) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+            URL.revokeObjectURL(url);
+            resolve(img);
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('Không thể tải hình ảnh'));
+        };
+        img.src = url;
+    });
+}
+
+// Hàm chuyển đổi hình ảnh sang JPEG
+async function convertImageToJpeg(img) {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (blob) {
+                blob.arrayBuffer().then(resolve).catch(reject);
+            } else {
+                reject(new Error('Không thể chuyển đổi hình ảnh'));
+            }
+        }, 'image/jpeg', 0.95);
+    });
+}
+
+// Hàm thêm hình ảnh vào PDF
+async function addImageToPdf(pdfDoc, imageFile) {
+    const img = await loadImage(imageFile);
+    const imageBytes = await imageFile.arrayBuffer();
+    
+    let embeddedImage;
+    if (imageFile.type === 'image/png') {
+        embeddedImage = await pdfDoc.embedPng(imageBytes);
+    } else {
+        // Chuyển đổi các định dạng khác sang JPEG
+        const jpegBytes = await convertImageToJpeg(img);
+        embeddedImage = await pdfDoc.embedJpg(jpegBytes);
+    }
+    
+    // Tạo trang với kích thước gốc của hình ảnh
+    const page = pdfDoc.addPage([img.width, img.height]);
+    
+    page.drawImage(embeddedImage, {
+        x: 0,
+        y: 0,
+        width: img.width,
+        height: img.height
+    });
+}
+
+// Hàm thêm một trang PDF vào PDF khác
+async function addPdfPageToPdf(pdfDoc, pdfFile, pageIndex) {
+    const arrayBuffer = await pdfFile.arrayBuffer();
+    const sourcePdf = await PDFLib.PDFDocument.load(arrayBuffer);
+    const [copiedPage] = await pdfDoc.copyPages(sourcePdf, [pageIndex]);
+    pdfDoc.addPage(copiedPage);
+}
+
+// Biến lưu trữ zoom level cho các preview
+let zoomLevels = {
+    merge: 100,
+    split: 100,
+    booklet: 100
+};
+
+// Biến lưu trữ chế độ resize
+let resizeModes = {
+    merge: 'original',
+    split: 'original',
+    booklet: 'original'
+};
+
+// Biến lưu trữ dữ liệu preview để có thể render lại
+let mergePreviewData = [];
+
+// Kích thước chuẩn (points: 1 inch = 72 points)
+const PAGE_SIZES = {
+    a4: { width: 595.28, height: 841.89 }, // A4: 210mm x 297mm
+    letter: { width: 612, height: 792 }     // Letter: 8.5" x 11"
+};
+
+// Hàm chuẩn hóa kích thước trang
+async function resizePage(page, targetSize) {
+    if (targetSize === 'original') {
+        return page;
+    }
+    
+    const { width, height } = page.getSize();
+    let newWidth, newHeight;
+    
+    if (targetSize === 'a4') {
+        newWidth = PAGE_SIZES.a4.width;
+        newHeight = PAGE_SIZES.a4.height;
+    } else if (targetSize === 'letter') {
+        newWidth = PAGE_SIZES.letter.width;
+        newHeight = PAGE_SIZES.letter.height;
+    } else {
+        return page; // original or unknown
+    }
+    
+    // Scale để fit vào kích thước mới
+    const scaleX = newWidth / width;
+    const scaleY = newHeight / height;
+    const scale = Math.min(scaleX, scaleY);
+    
+    page.scale(scale, scale);
+    
+    // Center trang trong kích thước mới
+    const scaledWidth = width * scale;
+    const scaledHeight = height * scale;
+    const offsetX = (newWidth - scaledWidth) / 2;
+    const offsetY = (newHeight - scaledHeight) / 2;
+    
+    page.setSize(newWidth, newHeight);
+    
+    return page;
+}
+
+// Lắng nghe thay đổi chế độ resize
+document.querySelectorAll('input[name="mergeSizeMode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        resizeModes.merge = e.target.value;
+    });
+});
+
+document.querySelectorAll('input[name="splitSizeMode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        resizeModes.split = e.target.value;
+    });
+});
+
+document.querySelectorAll('input[name="bookletSizeMode"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        resizeModes.booklet = e.target.value;
+    });
+});
+
+// Hàm zoom preview
+window.zoomPreview = function(section, direction) {
+    const step = 25;
+    const min = 50;
+    const max = 200;
+    
+    if (direction === 'in') {
+        zoomLevels[section] = Math.min(zoomLevels[section] + step, max);
+    } else {
+        zoomLevels[section] = Math.max(zoomLevels[section] - step, min);
+    }
+    
+    // Cập nhật label
+    const label = document.getElementById(`${section}ZoomLevel`);
+    if (label) {
+        label.textContent = `${zoomLevels[section]}%`;
+    }
+    
+    // Áp dụng zoom
+    let canvasId;
+    if (section === 'merge') {
+        canvasId = 'mergePreviewCanvas';
+    } else if (section === 'split') {
+        canvasId = 'splitPreviewCanvas';
+    } else if (section === 'booklet') {
+        canvasId = 'previewCanvas';
+    }
+    
+    const canvas = document.getElementById(canvasId);
+    if (canvas) {
+        const scale = zoomLevels[section] / 100;
+        canvas.style.transform = `scale(${scale})`;
+        canvas.style.transformOrigin = 'top center';
+        canvas.style.transition = 'transform 0.3s ease';
+    }
+};

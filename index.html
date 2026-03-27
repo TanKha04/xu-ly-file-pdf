@@ -21,11 +21,11 @@
 
         <!-- Tab Gộp PDF -->
         <div id="merge" class="tab-content active">
-            <h2>Gộp nhiều file PDF</h2>
+            <h2>Gộp nhiều file PDF và hình ảnh</h2>
             <div class="file-upload-wrapper">
-                <input type="file" id="mergeFiles" multiple accept=".pdf">
+                <input type="file" id="mergeFiles" multiple accept=".pdf,image/*,.jpg,.jpeg,.png,.gif,.bmp,.webp">
                 <label for="mergeFiles" class="file-upload-label">
-                    Chọn file PDF để gộp (có thể chọn nhiều lần)
+                    Chọn file PDF hoặc hình ảnh để gộp (có thể chọn nhiều lần)
                 </label>
             </div>
             <div id="mergeFileList" class="file-list"></div>
@@ -36,6 +36,11 @@
                 <h3>Xem trước các trang</h3>
                 <div class="preview-controls">
                     <p>💡 Kéo thả để sắp xếp lại thứ tự file</p>
+                    <div class="zoom-controls">
+                        <button class="btn-small zoom-btn" onclick="zoomPreview('merge', 'out')">🔍−</button>
+                        <span id="mergeZoomLevel">100%</span>
+                        <button class="btn-small zoom-btn" onclick="zoomPreview('merge', 'in')">🔍+</button>
+                    </div>
                 </div>
                 <div id="mergePreviewCanvas" class="preview-grid"></div>
             </div>
@@ -68,6 +73,25 @@
             
             <div id="splitPreview" class="preview-container" style="display: none;">
                 <h3>Xem trước các trang sẽ tách</h3>
+                <div class="preview-controls">
+                    <div class="zoom-controls">
+                        <button class="btn-small zoom-btn" onclick="zoomPreview('split', 'out')">🔍−</button>
+                        <span id="splitZoomLevel">100%</span>
+                        <button class="btn-small zoom-btn" onclick="zoomPreview('split', 'in')">🔍+</button>
+                    </div>
+                </div>
+                <div class="size-options">
+                    <label style="font-weight: 600; color: #00b4db; margin-right: 15px;">📏 Chuẩn hóa kích thước:</label>
+                    <label>
+                        <input type="radio" name="splitSizeMode" value="original" checked> Giữ nguyên
+                    </label>
+                    <label>
+                        <input type="radio" name="splitSizeMode" value="a4"> A4 (210×297mm)
+                    </label>
+                    <label>
+                        <input type="radio" name="splitSizeMode" value="letter"> Letter (216×279mm)
+                    </label>
+                </div>
                 <div id="splitPreviewCanvas" class="preview-grid"></div>
             </div>
         </div>
@@ -132,7 +156,26 @@
             
             <div id="bookletPreview" class="preview-container" style="display: none;">
                 <h3>Xem trước sổ PDF</h3>
-                <p style="color: #ff8c00; font-size: 14px; margin-top: 8px;">💡 Kéo thả để sắp xếp lại trang</p>
+                <div class="preview-controls">
+                    <p>💡 Kéo thả để sắp xếp lại trang</p>
+                    <div class="zoom-controls">
+                        <button class="btn-small zoom-btn" onclick="zoomPreview('booklet', 'out')">🔍−</button>
+                        <span id="bookletZoomLevel">100%</span>
+                        <button class="btn-small zoom-btn" onclick="zoomPreview('booklet', 'in')">🔍+</button>
+                    </div>
+                </div>
+                <div class="size-options">
+                    <label style="font-weight: 600; color: #00b4db; margin-right: 15px;">📏 Chuẩn hóa kích thước:</label>
+                    <label>
+                        <input type="radio" name="bookletSizeMode" value="original" checked> Giữ nguyên
+                    </label>
+                    <label>
+                        <input type="radio" name="bookletSizeMode" value="a4"> A4 (210×297mm)
+                    </label>
+                    <label>
+                        <input type="radio" name="bookletSizeMode" value="letter"> Letter (216×279mm)
+                    </label>
+                </div>
                 <div id="previewCanvas" class="preview-grid"></div>
             </div>
         </div>
